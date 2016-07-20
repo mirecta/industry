@@ -19,9 +19,6 @@ PID = '/tmp/thermometer.pid'
 HOST_NAME = '' # !!!REMEMBER TO CHANGE THIS!!!
 PORT_NUMBER = 8080 # Maybe set this to 9000.
 
-lock = Lock()
-queue = Queue()
-process = None
 
 mimeTypes = {'png':"image/png", 
             'jpg':"image/jpeg", 
@@ -183,7 +180,13 @@ def main():
     """
     global sensor
     global process 
-   
+  
+    global lock
+    global queue
+
+    lock = Lock()
+    queue = Queue()
+    
     #sensor = MCP9808.MCP9808(address=0x20, busnum=2)
     sensor = MCP9808.MCP9808()
     sensor.begin()
@@ -217,6 +220,6 @@ def handler(signum, frame):
 
 if __name__ == '__main__':
     
-    daemon = Daemonize(app="thermometer", pid=PID, action=main, keep_fds=[])
-    daemon.start() 
-    #main()
+     daemon = Daemonize(app="thermometer", pid=PID, action=main, keep_fds=[])
+     daemon.start() 
+     main()
