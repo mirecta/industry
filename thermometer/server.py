@@ -153,7 +153,7 @@ def readSensors():
     lock.acquire()
     temp = sensor.readTempC()    
     lock.release()
-    data.append("%0.1f" % temp)
+    data.append("T%0.1f" % temp)
     return data
     #enddef
 
