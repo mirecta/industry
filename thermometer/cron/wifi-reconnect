@@ -1,0 +1,3 @@
+
+
+*/5 *     * * *     root   [ -x /home/pi/wifi-reconnect.sh ] && /home/pi/wifi-reconnect.sh &>/dev/null
