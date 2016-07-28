@@ -11,17 +11,23 @@ import signal
 
 from daemonize import Daemonize
 
-import Adafruit_MCP9808.MCP9808 as MCP9808
-import Adafruit_DHT
 
 
 
 DOC_ROOT = '/home/pi/thermometer/www/'
 INTERVAL = '/home/pi/thermometer/interval'
 PID = '/tmp/thermometer.pid'
-PIN=4
+PIN=4 # pin of DHT sensor
+SADDRESS = 0x20 # address of mcp sensor
 HOST_NAME = '' # !!!REMEMBER TO CHANGE THIS!!!
 PORT_NUMBER = 8080 # Maybe set this to 9000.
+SENSOR='MCP'  # or DHT
+
+if SENSOR == 'MCP':
+    import Adafruit_MCP9808.MCP9808 as MCP9808
+elif SENSOR == 'DHT':
+    import Adafruit_DHT
+#endif
 
 
 mimeTypes = {'png':"image/png", 
@@ -156,12 +162,16 @@ def readSensors():
     data = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"),]
     lock.acquire()
     #sensor MCP9808
-    #temp = sensor.readTempC()    
+    if SENSOR == 'MCP':
+        temp = sensor.readTempC()    
     #sensor DHT22
-    hum, temp = Adafruit_DHT.read_retry(Adafruit_DHT.AM2302, PIN)
+    elif SENSOR == 'DHT':
+        hum, temp = Adafruit_DHT.read_retry(Adafruit_DHT.AM2302, PIN)
+        data.append("H%0.1f" % hum)
+    #endif
+
     lock.release()
     data.append("T%0.1f" % temp)
-    data.append("H%0.1f" % hum)
     return data
     #enddef
 
@@ -195,11 +205,12 @@ def main():
     queue = Queue()
     
     #sensor MCP9808
-    #global sensor
-    #sensor = MCP9808.MCP9808(address=0x20, busnum=2)
-    #sensor = MCP9808.MCP9808()
-    #sensor.begin()
-    
+    if SENSOR == "MCP":
+        global sensor
+        sensor = MCP9808.MCP9808()
+        #sensor = MCP9808.MCP9808()
+        sensor.begin()
+    #endif
     #make process
     process = Process(target=readProcess)
     process.start()
@@ -229,6 +240,6 @@ def handler(signum, frame):
 
 if __name__ == '__main__':
     
-     daemon = Daemonize(app="thermometer", pid=PID, action=main, keep_fds=[])
-     daemon.start() 
+    daemon = Daemonize(app="thermometer", pid=PID, action=main, keep_fds=[])
+    daemon.start() 
     #main()
