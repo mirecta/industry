@@ -6,16 +6,20 @@ import urlparse
 import socket
 from datetime import timedelta, datetime
 from multiprocessing import Process, Value, Queue, Lock
-import Adafruit_MCP9808.MCP9808 as MCP9808
 import sys
 import signal
 
 from daemonize import Daemonize
 
+import Adafruit_MCP9808.MCP9808 as MCP9808
+import Adafruit_DHT
+
+
+
 DOC_ROOT = '/home/pi/thermometer/www/'
 INTERVAL = '/home/pi/thermometer/interval'
 PID = '/tmp/thermometer.pid'
-
+PIN=4
 HOST_NAME = '' # !!!REMEMBER TO CHANGE THIS!!!
 PORT_NUMBER = 8080 # Maybe set this to 9000.
 
@@ -151,9 +155,13 @@ def readSensors():
     """
     data = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"),]
     lock.acquire()
-    temp = sensor.readTempC()    
+    #sensor MCP9808
+    #temp = sensor.readTempC()    
+    #sensor DHT22
+    hum, temp = Adafruit_DHT.read_retry(Adafruit_DHT.AM2302, PIN)
     lock.release()
     data.append("T%0.1f" % temp)
+    data.append("H%0.1f" % hum)
     return data
     #enddef
 
@@ -178,7 +186,6 @@ def readProcess():
 def main():
     """
     """
-    global sensor
     global process 
   
     global lock
@@ -187,9 +194,11 @@ def main():
     lock = Lock()
     queue = Queue()
     
+    #sensor MCP9808
+    #global sensor
     #sensor = MCP9808.MCP9808(address=0x20, busnum=2)
-    sensor = MCP9808.MCP9808()
-    sensor.begin()
+    #sensor = MCP9808.MCP9808()
+    #sensor.begin()
     
     #make process
     process = Process(target=readProcess)
@@ -222,4 +231,4 @@ if __name__ == '__main__':
     
      daemon = Daemonize(app="thermometer", pid=PID, action=main, keep_fds=[])
      daemon.start() 
-     main()
+    #main()
