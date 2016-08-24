@@ -21,7 +21,9 @@ case "$1" in
     stop)
         echo "Stopping thermometer"
         PID=`cat $PIDFILE`
-        kill $PID
+        pkill -TERM -P $PID
+        sleep 5
+        kill -9 `ps aux | grep thermometer\/server\.py | grep -v grep | cut -d' ' -f7 | fmt`
         ;;
     *)
         echo "Usage: /etc/init.d/thermometer start|stop"

@@ -12,16 +12,17 @@ import signal
 from daemonize import Daemonize
 
 
-
+SENSORS=2
 
 DOC_ROOT = '/home/pi/thermometer/www/'
 INTERVAL = '/home/pi/thermometer/interval'
 PID = '/tmp/thermometer.pid'
-PIN=4 # pin of DHT sensor
+PIN1=4 # pin of DHT sensor
+PIN2=17 
 SADDRESS = 0x20 # address of mcp sensor
 HOST_NAME = '' # !!!REMEMBER TO CHANGE THIS!!!
 PORT_NUMBER = 8080 # Maybe set this to 9000.
-SENSOR='MCP'  # or DHT
+SENSOR='DHT'  # or DHT
 
 if SENSOR == 'MCP':
     import Adafruit_MCP9808.MCP9808 as MCP9808
@@ -43,6 +44,16 @@ mimeTypes = {'png':"image/png",
 
 
 
+def getOneInt(p,name,default):
+    """
+    """
+    value = p.get(name)
+    if value == None:
+        return default
+    else:
+        return int(value[0])
+    #endif
+#enddef
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_HEAD(self):
@@ -79,12 +90,14 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     #enddef
   
     def handleGet(self,url,params):
-
+        sensor = getOneInt(params,"sensor",1)
+        
+        
         self.send_response(200)
         self.send_header("Content-type","text/plain") 
         self.end_headers()
-        while not queue.empty():
-            self.wfile.write('|'.join(queue.get()))
+        while not queues[sensor - 1].empty():
+            self.wfile.write('|'.join(queues[sensor - 1].get()))
             self.wfile.write("\n")
         #endwhile
     #enddef
@@ -93,11 +106,12 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         """
         """
         data = readSensors()
+        sensor = getOneInt(params,"sensor",1)
 
         self.send_response(200)
         self.send_header("Content-type","text/plain") 
         self.end_headers()
-        self.wfile.write('|'.join(data))
+        self.wfile.write('|'.join(data[sensor - 1]))
         self.wfile.write("\n")
 
     #enddef
@@ -159,20 +173,29 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 def readSensors():
     """
     """
-    data = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"),]
+    data = [[datetime.now().strftime("%Y-%m-%d %H:%M:%S"),],[datetime.now().strftime("%Y-%m-%d %H:%M:%S"),]]
     lock.acquire()
     #sensor MCP9808
     if SENSOR == 'MCP':
         temp = sensor.readTempC()    
     #sensor DHT22
     elif SENSOR == 'DHT':
-        hum, temp = Adafruit_DHT.read_retry(Adafruit_DHT.AM2302, PIN)
-        data.append("H%0.1f" % hum)
+        hum, temp = Adafruit_DHT.read_retry(Adafruit_DHT.AM2302, PIN1)
+        data[0].append("H%0.1f" % hum)
     #endif
-
+    data[0].append("T%0.1f" % temp)
+    #sensor MCP9808
+    if SENSOR == 'MCP':
+        temp = sensor.readTempC()    
+    #sensor DHT22
+    elif SENSOR == 'DHT':
+        hum, temp = Adafruit_DHT.read_retry(Adafruit_DHT.AM2302, PIN2)
+        data[1].append("H%0.1f" % hum)
+    #endif
+    data[1].append("T%0.1f" % temp)
     lock.release()
-    data.append("T%0.1f" % temp)
     return data
+  
     #enddef
 
 def readProcess():
@@ -185,8 +208,11 @@ def readProcess():
     fl.close()
     while True:
         data = readSensors()
-        queue.put(data)
-        #print data
+        i = 0
+        for queue in queues:
+            queue.put(data[i])
+            i+=1
+            #print data[i]
         time.sleep(interval)
     #endwhile
 #enddef
@@ -199,17 +225,22 @@ def main():
     global process 
   
     global lock
-    global queue
+    global queues
+    queues = []
+    for i in range(0,SENSORS):
+        queues.append(Queue())
+    #endfor
 
     lock = Lock()
-    queue = Queue()
     
     #sensor MCP9808
     if SENSOR == "MCP":
-        global sensor
-        sensor = MCP9808.MCP9808()
-        #sensor = MCP9808.MCP9808()
-        sensor.begin()
+        global sensors
+        sensors = []
+        for i in range(0,SENSORS):
+            sensors.append(MCP9808.MCP9808())
+            #sensor = MCP9808.MCP9808()
+            sensors[-1].begin()
     #endif
     #make process
     process = Process(target=readProcess)
@@ -235,11 +266,12 @@ def main():
 def handler(signum, frame):
     if signum in [15,9]:
         process.terminate()
+        time.sleep(3)
         sys.exit(0)
 
 
 if __name__ == '__main__':
-    
+        
     daemon = Daemonize(app="thermometer", pid=PID, action=main, keep_fds=[])
     daemon.start() 
     #main()
